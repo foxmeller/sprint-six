@@ -54,7 +54,7 @@ func getTasks(w http.ResponseWriter, r *http.Request) {
 	// так как все успешно, то статус OK
 	w.WriteHeader(http.StatusOK)
 	// записываем сериализованные в JSON данные в тело ответа
-	w.Write(resp)
+	_, _ = w.Write(resp)
 }
 
 func postTask(w http.ResponseWriter, r *http.Request) {
@@ -65,6 +65,13 @@ func postTask(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	for _, t := range tasks {
+		if t.ID == task.ID {
+			http.Error(w, "Задача с таким Id уже существует", http.StatusConflict)
+			return
+		}
 	}
 
 	if err = json.Unmarshal(buf.Bytes(), &task); err != nil {
@@ -83,7 +90,7 @@ func getTask(w http.ResponseWriter, r *http.Request) {
 
 	task, ok := tasks[id]
 	if !ok {
-		http.Error(w, "Задача не найдена", http.StatusNoContent)
+		http.Error(w, "Задача не найдена", http.StatusBadRequest)
 		return
 	}
 
@@ -101,21 +108,16 @@ func getTask(w http.ResponseWriter, r *http.Request) {
 func deleteTask(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	task, ok := tasks[id]
+	_, ok := tasks[id]
 	if !ok {
-		http.Error(w, "Задача не найдена", http.StatusNoContent)
+		http.Error(w, "Задача не найдена", http.StatusBadRequest)
 		return
 	}
 	delete(tasks, id)
-	resp, err := json.Marshal(task)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(resp)
+
 }
 
 func main() {
@@ -131,7 +133,7 @@ func main() {
 	// регистрируем в роутере эндпоинт `/task/{id}` с методом GET, для которого используется обработчик `gettask`
 	r.Get("/task/{id}", getTask)
 	// регистрируем в роутере эндпоинт `/tasks/{id}` с методом DELETE, для которого используется обработчик `deleteTask`
-	r.Get("/tasks/{id}", deleteTask)
+	r.Delete("/tasks/{id}", deleteTask)
 
 	// запускаем сервер
 	if err := http.ListenAndServe(":8080", r); err != nil {
